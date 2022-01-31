@@ -6,12 +6,9 @@ LABEL author="alper.kucukural@umassmed.edu" description="Docker image containing
 RUN apt-get update && apt-get install -y gcc libltdl7 libtbb-dev libcairo2-dev
 RUN conda update -n base -c defaults conda
 COPY environment.yml /
-RUN conda env create -n myenv -f /environment.yml && conda clean -a
+RUN conda env create -f /environment.yml && conda clean -a
 RUN mkdir -p /project /nl /mnt /share
-ENV PATH /opt/conda/envs/dolphinnext-barcodeseq-1.0/bin:$PATH
-
-COPY .bashrc /root/
-SHELL ["/bin/bash", "--login", "-c"]
+ENV PATH /opt/conda/envs/dolphinnext/bin:$PATH
 
 COPY install_packages.R /
 RUN Rscript /install_packages.R
