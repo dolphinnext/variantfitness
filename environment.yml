@@ -19,9 +19,3 @@ dependencies:
   - bedtools=2.27.1
   - igvtools=2.5.3
   - r-base=4.0.3
-  - python=3.7.8
-  - numpy=1.19.1
-  - seaborn=0.10.1
-  - matplotlib=3.3.0
-  - pandas=1.0.5
-
