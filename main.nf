@@ -28,7 +28,7 @@ Channel
 Channel.value(params.mate).into{g_3_mate_g_13;g_3_mate_g15_3;g_3_mate_g15_11;g_3_mate_g15_16;g_3_mate_g15_18;g_3_mate_g15_19;g_3_mate_g15_20;g_3_mate_g15_21}
 Channel.value(params.wtseq).into{g_18_barcode_g_17;g_18_barcode_g_24;g_18_barcode_g_25}
 g_26_txtFile_g_25 = file(params.metadata, type: 'any')
-Channel.value(params.startpos).set{g_27_value_tuple_g_24}
+Channel.value(params.startpos).into{g_27_value_tuple_g_24;g_27_value_tuple_g_29}
 
 //* params.run_Adapter_Removal =   "no"   //* @dropdown @options:"yes","no" @show_settings:"Adapter_Removal"
 //* @style @multicolumn:{seed_mismatches, palindrome_clip_threshold, simple_clip_threshold} @condition:{Tool_for_Adapter_Removal="trimmomatic", seed_mismatches, palindrome_clip_threshold, simple_clip_threshold}, {Tool_for_Adapter_Removal="fastx_clipper", discard_non_clipped}
@@ -1233,6 +1233,7 @@ process fitnessHeatmap {
 publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*.pdf$/) "heatmaps/$filename"}
 input:
  file SFvals from g_25_outFileTSV_g_29
+ val startpos from g_27_value_tuple_g_29
 
 output:
  file '*.pdf'  into g_29_outputFilePdf0
