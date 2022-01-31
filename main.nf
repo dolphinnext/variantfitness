@@ -991,7 +991,7 @@ input:
 
 output:
  file "*.tsv"  into g_25_outFileTSV0
- file "*SF_vals.tsv"  into g_25_outFileTSV1
+ file "*AA_SF_vals.tsv"  into g_25_outFileTSV_g_29
 
 errorStrategy 'retry'
 maxRetries 0
@@ -1225,6 +1225,70 @@ while(my $meta=<META>){
 '''
 
 
+}
+
+
+process fitnessHeatmap {
+
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*.pdf$/) "heatmaps/$filename"}
+input:
+ file SFvals from g_25_outFileTSV_g_29
+
+output:
+ file '*.pdf'  into g_29_outputFilePdf0
+
+errorStrategy 'retry'
+maxRetries 1
+
+shell:
+'''
+#!/usr/bin/env Rscript
+
+library(ComplexHeatmap)
+library(reshape2)
+library(circlize)
+
+# make matrix of values
+filename <- "!{SFvals}"
+comp <- str_split(filename, "_AA_SF_vals.tsv")
+comp <- comp[[1]][1]
+datax <- read.table(filename, sep = "\t", header = T)
+datax$pos <- datax$pos + startpos - 1
+datax_unmelted = dcast(datax, aa~pos)
+rownames(datax_unmelted) <- datax_unmelted[,1]
+datax_unmelted <- datax_unmelted[,-1]
+rownames_datax_unmelted <- rownames(datax_unmelted)
+
+# make matrix of annotations
+datax_label = dcast(datax, aa~pos, value.var = "annot")
+rownames(datax_label) <- datax_label[,1]
+datax_label <- datax_label[,-1]
+datax_label <- datax_label[rownames_datax_unmelted,]
+
+# set legend 
+at <- seq(min(datax_unmelted), max(datax_unmelted), by = round((max(datax_unmelted)-min(datax_unmelted))/6))
+at <- c(at, max(datax_unmelted))
+col_fun2 = colorRamp2(breaks = c(-50, 0, 50), colors = c("blue" ,"black", "red"))
+
+# Heatmap
+x <- ComplexHeatmap::Heatmap(datax_unmelted, 
+     heatmap_legend_param = list(title = paste("Fitness Effect ", comp), legend_direction = "horizontal", color_bar = "continuous",
+             at = c(at[1], at[4], at[7]), labels = c("Deleterious","WT-like","Beneficial"), col = col_fun2), 
+     show_column_dend = FALSE, show_row_dend = FALSE, 
+     cluster_rows = FALSE, cluster_columns = FALSE,
+     column_names_rot = 90,
+     cell_fun = function(j, i, x, y, width, height, fill) {
+         if(datax_label[i,j] == "wt") {
+             grid.rect(x = x, y = y, width = width, height = height, gp = gpar(col = "black", fill = "transparent", lwd=unit(2, "cm")))
+         }
+     }
+)
+
+pdf(paste0(comp, "_heatmap.pdf"), height=8, width=3,  paper = "a4r", compress=TRUE)
+draw(x, heatmap_legend_side = "top")
+graphics.off()
+
+'''
 }
 
 
