@@ -3,7 +3,7 @@ FROM nfcore/base:dev
 
 LABEL author="alper.kucukural@umassmed.edu" description="Docker image containing all requirements for the dolphinnext/barcodseq pipeline"
 
-RUN apt-get update && apt-get install -y gcc libltdl7 libtbb-dev
+RUN apt-get update && apt-get install -y gcc libltdl7 libtbb-dev libcairo2-dev
 
 COPY environment.yml /
 RUN conda env create -n myenv -f /environment.yml && conda clean -a
