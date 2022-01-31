@@ -6,6 +6,7 @@ if (!params.reads){params.reads = ""}
 if (!params.mate){params.mate = ""} 
 if (!params.wtseq){params.wtseq = ""} 
 if (!params.metadata){params.metadata = ""} 
+if (!params.startpos){params.startpos = ""} 
 // Stage empty file to be used as an optional input where required
 ch_empty_file_1 = file("$baseDir/.emptyfiles/NO_FILE_1", hidden:true)
 ch_empty_file_2 = file("$baseDir/.emptyfiles/NO_FILE_2", hidden:true)
@@ -27,6 +28,7 @@ Channel
 Channel.value(params.mate).into{g_3_mate_g_13;g_3_mate_g15_3;g_3_mate_g15_11;g_3_mate_g15_16;g_3_mate_g15_18;g_3_mate_g15_19;g_3_mate_g15_20;g_3_mate_g15_21}
 Channel.value(params.wtseq).into{g_18_barcode_g_17;g_18_barcode_g_24;g_18_barcode_g_25}
 g_26_txtFile_g_25 = file(params.metadata, type: 'any')
+Channel.value(params.startpos).set{g_27_value_tuple_g_24}
 
 //* params.run_Adapter_Removal =   "no"   //* @dropdown @options:"yes","no" @show_settings:"Adapter_Removal"
 //* @style @multicolumn:{seed_mismatches, palindrome_clip_threshold, simple_clip_threshold} @condition:{Tool_for_Adapter_Removal="trimmomatic", seed_mismatches, palindrome_clip_threshold, simple_clip_threshold}, {Tool_for_Adapter_Removal="fastx_clipper", discard_non_clipped}
@@ -981,6 +983,7 @@ sub replace {
 
 process calcFS {
 
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*.tsv$/) "SFVals/$filename"}
 input:
  file nt_A from g_20_outFileTSV_g_25
  file meta from g_26_txtFile_g_25
@@ -1231,6 +1234,7 @@ publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*
 input:
  file tsvfile from g_20_outFileTSV_g_24
  val wtseq from g_18_barcode_g_24
+ val startpos from g_27_value_tuple_g_24
 
 output:
  file "*.pdf"  into g_24_outputFilePdf0
