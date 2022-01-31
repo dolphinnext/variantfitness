@@ -5,10 +5,7 @@ new.pkg <- pkg[!(pkg %in% installed.packages()[, 'Package'])]
   sapply(pkg, require, character.only = TRUE)
 }
 
-packages <- c('ggplot2', 'plyr', 'dplyr', 'data.table', 'reshape', 'RColorBrewer', 'reshape2', 'circlize')
+packages <- c('BiocManager', 'ggplot2', 'plyr', 'dplyr', 'data.table', 'reshape', 'RColorBrewer', 'reshape2', 'circlize')
 inst_pack(packages)
-
-if (!require("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
 
 BiocManager::install("ComplexHeatmap")
