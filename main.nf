@@ -5,6 +5,20 @@ params.outdir = 'results'
 if (!params.reads){params.reads = ""} 
 if (!params.mate){params.mate = ""} 
 if (!params.wtseq){params.wtseq = ""} 
+if (!params.metadata){params.metadata = ""} 
+if (!params.startpos){params.startpos = ""} 
+// Stage empty file to be used as an optional input where required
+ch_empty_file_1 = file("$baseDir/.emptyfiles/NO_FILE_1", hidden:true)
+ch_empty_file_2 = file("$baseDir/.emptyfiles/NO_FILE_2", hidden:true)
+ch_empty_file_3 = file("$baseDir/.emptyfiles/NO_FILE_3", hidden:true)
+ch_empty_file_4 = file("$baseDir/.emptyfiles/NO_FILE_4", hidden:true)
+ch_empty_file_5 = file("$baseDir/.emptyfiles/NO_FILE_5", hidden:true)
+ch_empty_file_6 = file("$baseDir/.emptyfiles/NO_FILE_6", hidden:true)
+ch_empty_file_7 = file("$baseDir/.emptyfiles/NO_FILE_7", hidden:true)
+ch_empty_file_8 = file("$baseDir/.emptyfiles/NO_FILE_8", hidden:true)
+ch_empty_file_9 = file("$baseDir/.emptyfiles/NO_FILE_9", hidden:true)
+ch_empty_file_10 = file("$baseDir/.emptyfiles/NO_FILE_10", hidden:true)
+ch_empty_file_11 = file("$baseDir/.emptyfiles/NO_FILE_11", hidden:true)
 
 Channel
 	.fromFilePairs( params.reads , size: params.mate == "single" ? 1 : params.mate == "pair" ? 2 : params.mate == "triple" ? 3 : params.mate == "quadruple" ? 4 : -1 )
@@ -12,7 +26,9 @@ Channel
 	.into{g_2_reads_g15_3;g_2_reads_g15_18}
 
 Channel.value(params.mate).into{g_3_mate_g_13;g_3_mate_g15_3;g_3_mate_g15_11;g_3_mate_g15_16;g_3_mate_g15_18;g_3_mate_g15_19;g_3_mate_g15_20;g_3_mate_g15_21}
-Channel.value(params.wtseq).into{g_18_barcode_g_17;g_18_barcode_g_24}
+Channel.value(params.wtseq).into{g_18_barcode_g_17;g_18_barcode_g_24;g_18_barcode_g_25}
+g_26_txtFile_g_25 = file(params.metadata, type: 'any')
+Channel.value(params.startpos).set{g_27_value_tuple_g_24}
 
 //* params.run_Adapter_Removal =   "no"   //* @dropdown @options:"yes","no" @show_settings:"Adapter_Removal"
 //* @style @multicolumn:{seed_mismatches, palindrome_clip_threshold, simple_clip_threshold} @condition:{Tool_for_Adapter_Removal="trimmomatic", seed_mismatches, palindrome_clip_threshold, simple_clip_threshold}, {Tool_for_Adapter_Removal="fastx_clipper", discard_non_clipped}
@@ -28,7 +44,7 @@ if ($HOSTNAME == "ghpcc06.umassrc.org"){
 //* platform
 //* autofill
 if (!((params.run_Adapter_Removal && (params.run_Adapter_Removal == "yes")) || !params.run_Adapter_Removal)){
-g_2_reads_g15_18.into{g15_18_reads_g15_19}
+g_2_reads_g15_18.set{g15_18_reads_g15_19}
 g15_18_log_file_g15_11 = Channel.empty()
 } else {
 
@@ -163,7 +179,7 @@ if ($HOSTNAME == "ghpcc06.umassrc.org"){
 //* platform
 //* autofill
 if (!((params.run_Trimmer && (params.run_Trimmer == "yes")) || !params.run_Trimmer)){
-g15_18_reads_g15_19.into{g15_19_reads_g15_20}
+g15_18_reads_g15_19.set{g15_19_reads_g15_20}
 g15_19_log_file_g15_21 = Channel.empty()
 } else {
 
@@ -421,7 +437,7 @@ if ($HOSTNAME == "ghpcc06.umassrc.org"){
 //* platform
 //* autofill
 if (!((params.run_Quality_Filtering && (params.run_Quality_Filtering == "yes")) || !params.run_Quality_Filtering)){
-g15_19_reads_g15_20.into{g15_20_reads_g_13}
+g15_19_reads_g15_20.set{g15_20_reads_g_13}
 g15_20_log_file_g15_16 = Channel.empty()
 } else {
 
@@ -551,6 +567,8 @@ output:
 errorStrategy 'retry'
 maxRetries 2
 
+label 'pandaseq'
+
 script:
 run_merge = params.run_Merge_Pairs
 nameAll = reads.toString()
@@ -574,12 +592,12 @@ if (nameAll.contains('.gz')) {
 mkdir reads
 if [ "${mate}" == "pair" ]; then
     if [ "${run_merge}" == "yes" ]; then
-        pandaseq -F -N -T 40 -l 50 -f ${file1} -r ${file2} -w reads/${name}.fastq
+        pandaseq -F -N -T 40 -l 50 -f ${file1} -r ${file2} -w reads/${name}.fastq > /dev/null 2>&1  
     else
         cat ${file1} ${file2} > reads/${name}.fastq
     fi
 else
-    mv $file1 ${name}.fastq 2>/dev/null
+    mv $file1 ${name}.fastq > /dev/null 2>&1
     mv ${name}.fastq reads/.
 fi
 
@@ -589,16 +607,12 @@ fi
 
 
 if (!((params.run_Extract_Barcode && (params.run_Extract_Barcode == "yes")))){
-g_13_reads_g_14.into{g_14_reads_g_17}
+g_13_reads_g_14.set{g_14_reads_g_17}
 } else {
 
 process Extract_Barcode {
 
-publishDir params.outdir, overwrite: true, mode: 'copy',
-	saveAs: {filename ->
-	if (filename =~ /ext\/.*.fastq$/) "barcodes/$filename"
-}
-
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /ext\/.*.fastq$/) "barcodes/$filename"}
 input:
  set val(name),file(reads) from g_13_reads_g_14
 
@@ -611,20 +625,51 @@ maxRetries 3
 when:
 (params.run_Extract_Barcode && (params.run_Extract_Barcode == "yes"))
 
-script:
+shell:
+count_reverse_complement = params.count_reverse_complement
 five_prime = params.Extract_Barcode.five_prime
 three_prime = params.Extract_Barcode.three_prime
 min_len = params.Extract_Barcode.min_len
 max_len = params.Extract_Barcode.max_len
 mismatch = params.Extract_Barcode.mismatch
 
-"""
-#!/bin/sh 
-mkdir -p ext
-cutadapt -a ${three_prime} -n ${mismatch} -o ext/${name}.tmp ${reads}
-cutadapt -g ${five_prime} -m ${min_len} -M $max_len -n ${mismatch} -o ext/${name}.fastq ext/${name}.tmp
+'''
+#!/usr/bin/env perl
 
-"""
+my $count_reverse_complement = "!{count_reverse_complement}";
+my $five_prime = "!{five_prime}";
+my $three_prime = "!{three_prime}";
+my $min_len = "!{min_len}";
+my $max_len = "!{max_len}";
+my $mismatch = "!{mismatch}";
+
+runCmd("mkdir -p ext");
+
+if ($count_reverse_complement eq "no"){
+	runCmd("cutadapt -a $three_prime -n $mismatch -o ext/!{name}.tmp !{reads}");
+	runCmd("cutadapt -g $five_prime -m $min_len -M $max_len -n $mismatch -o ext/!{name}.fastq ext/!{name}.tmp");
+}
+else {
+	my $rev_threeprime=$three_prime;
+	my $rev_fiveprime=$five_prime;
+	$rev_threeprime=~tr/ACGT/TGCA/;
+	$rev_fiveprime=~tr/ACGT/TGCA/;
+	$rev_threeprime = reverse($rev_threeprime);
+	$rev_fiveprime = reverse($rev_fiveprime);
+	runCmd("cutadapt -a $three_prime -n $mismatch -o ext/!{name}.tmp.1 !{reads}");
+	runCmd("cutadapt -g $five_prime -m $min_len -M $max_len -n $mismatch -o ext/!{name}.tmp.2 ext/!{name}.tmp.1");
+	runCmd("cutadapt -a $rev_fiveprime -n $mismatch -o ext/!{name}.tmp.3 !{reads}");
+	runCmd("cutadapt -g $rev_threeprime -m $min_len -M $max_len -n $mismatch -o ext/!{name}.tmp.4 ext/!{name}.tmp.3");
+	runCmd("cat ext/!{name}.tmp.2 ext/!{name}.tmp.4 > ext/!{name}.fastq");
+}
+##Subroutines
+sub runCmd {
+    my ($com) = @_;
+    my $error = system($com);
+    if   ($error) { die "Command failed: $error $com\\n"; }
+    else          { print "Command successful: $com\\n"; }
+}
+'''
 
 }
 }
@@ -641,7 +686,9 @@ output:
  set "*.tsv"  into g_17_outputFileTSV_g_20
 
 errorStrategy 'retry'
-maxRetries 2
+maxRetries 0
+when:
+(params.run_countA && (params.run_countA == "yes"))
 
 shell:
 '''
@@ -650,7 +697,7 @@ shell:
 open(READS, "!{reads}");
 my $wtseq= "!{wtseq}";
 my $name ="!{name}";
-
+my @aalist= qw(A R N D C Q E G H I L K M F P S T W Y V *);
 my %table = (
     'TCA' => 'S',    # Serine
     'TCC' => 'S',    # Serine
@@ -719,24 +766,38 @@ my %table = (
     );
 
 my %count=();
+my $wtcount=0;
+my $wtcount_aa=0;
+my %countaa=();
 my %annot=();
+my %annotaa=();
 my $len=length($wtseq)/3;
 
+# prepare has variables to count R abundance values 
 for(my $i=1; $i<=$len; $i++)
 {
    $count{$i}=() if (!exists($count{$i}));
+   $countaa{$i}=() if (!exists($countaa{$i}));
    $annot{$i}=() if (!exists($annot{$i}));
+   $annotaa{$i}=() if (!exists($annotaa{$i}));
    my $wtnt = substr($wtseq, ($i-1)*3, 3);
    my $wtaa= $table{$wtnt};
    foreach my $codon (keys %table){
       $count{$i}{$codon}=0 if (!exists($count{$i}{$codon}));
+      $annot{$i}{$codon}=0 if (!exists($annot{$i}{$codon}));
+      my $aa = $table{$codon};
+      $countaa{$i}{$aa}=0 if (!exists($countaa{$i}{$aa}));
+      $annotaa{$i}{$aa}="NA" if (!exists($annotaa{$i}{$aa}));
       my $ann="mut";
-      $ann = "syn" if($wtaa eq $table{$codon});
+      $ann = "syn" if($wtaa eq $aa);
       $ann = "wt" if($wtnt eq $codon);
-      $ann = "stop" if("*" eq $table{$codon});
+      $ann = "stop" if("*" eq $aa);
       $annot{$i}{$codon}=$ann;  
+      $ann = "wt" if ($ann eq "syn");
+      $annotaa{$i}{$aa}=$ann;
   }
 }
+# count R abundance values per position per codon and aminocacid 
 my $j=0;
 while($read=<READS>)
 {
@@ -746,38 +807,88 @@ while($read=<READS>)
      print "$j reads processed!\n"; 
   }
   if ($read=~/^([ACGT]*)$/) {
+     # Find which position has a mutation
+     # if there is no mutation icrease WT
+     # If there is more than one mutation discard the read
+     my $mutpos=0;
+     my $mutnt="";
+     my $num_of_mut=0;
      for(my $i=1; $i<=$len; $i++)
      {
-          $count{$i}{substr($read, ($i-1)*3, 3)}++;
+          my $codon = substr($read, ($i-1)*3, 3);
+          my $wtcodon = substr($wtseq, ($i-1)*3, 3);
+          if ($codon ne $wtcodon){
+          	$mutpos=$i;
+          	$num_of_mut++;
+          	$mutnt=$codon;
+          }
      }
+     my $aa = $table{$mutnt};
+     if ($num_of_mut == 1){ 
+		$count{$mutpos}{$mutnt}++;
+		$countaa{$mutpos}{$aa}++;
+	 } 
+	 if ($num_of_mut == 0) {
+		$wtcount++;
+		$wtcount_aa++;
+	}
   }
 }
 
-open(OUT, ">", $name."_Acounts.tsv");
-print OUT "codon\\taa\\tpos\\tannot\\tcount\n";
+#Add wild type counts to each position
 for(my $i=1; $i<=$len; $i++)
 {
+	my $wtcodon = substr($wtseq, ($i-1)*3, 3);
+	$count{$i}{$wtcodon}=$wtcount;
+	my $aa = $table{$wtcodon};
+	$countaa{$i}{$aa}=$wtcount_aa;
+}
+
+# Get WT counts per position to be able to calculate A relative abundance values using log2(Rmut/Rwt) 
+# if any R value is 0, a pseduo count 1 used to calculate log2 for that position
+
+
+open(OUTNT_R, ">", $name."_nt_R_counts.tsv");
+print OUTNT_R "codon\\taa\\tpos\\tannot\\tRcount\n";
+open(OUTAA_R, ">", $name."_aa_R_counts.tsv");
+print OUTAA_R "aa\\tpos\\tannot\\tRcount\n";
+open(OUTNT_A, ">", $name."_nt_A_counts.tsv");
+print OUTNT_A "codon\\taa\\tpos\\tannot\\tAcount\n";
+open(OUTAA_A, ">", $name."_aa_A_counts.tsv");
+print OUTAA_A "aa\\tpos\\tannot\\tAcount\n";
+for(my $i=1; $i<=$len; $i++)
+{
+   $wtcount{$i}=1 if ($wtcount{$i} == 0);
    foreach my $codon (sort keys %table){
-      print OUT $codon."\\t".$table{$codon}."\\t".$i."\\t".$annot{$i}{$codon}."\\t".$count{$i}{$codon}."\n";
+      print OUTNT_R $codon."\\t".$table{$codon}."\\t".$i."\\t".$annot{$i}{$codon}."\\t".$count{$i}{$codon}."\n";
+      $count{$i}{$codon}=1 if ($count{$i}{$codon}==0);
+      print OUTNT_A $codon."\\t".$table{$codon}."\\t".$i."\\t".$annot{$i}{$codon}."\\t".log($count{$i}{$codon}/$wtcount)/log(2)."\n";
+   }
+   $wtcount_aa{$i}=1 if ($wtcount_aa{$i} == 0);
+   foreach my $aa (@aalist){
+      print OUTAA_R $aa."\\t".$i."\\t".$annotaa{$i}{$aa}."\\t".$countaa{$i}{$aa}."\n";
+      $countaa{$i}{$aa} = 1 if ($countaa{$i}{$aa}==0);
+      print OUTAA_A $aa."\\t".$i."\\t".$annotaa{$i}{$aa}."\\t".log($countaa{$i}{$aa}/$wtcount_aa)/log(2)."\n";
    }
 }
-close(OUT);
+close(OUTNN_R);
+close(OUTAA_R);
+close(OUTNN_A);
+close(OUTAA_A);
 '''
 }
 
 
 process mergeACounts {
 
-publishDir params.outdir, overwrite: true, mode: 'copy',
-	saveAs: {filename ->
-	if (filename =~ /out\/.*.tsv$/) "Acounts/$filename"
-}
-
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /out\/.*.tsv$/) "ARcounts/$filename"}
 input:
  file tsv from g_17_outputFileTSV_g_20.collect()
 
 output:
- file "out/*.tsv"  into g_20_outFileTSV_g_24
+ file "out/*.tsv"  into g_20_outFileTSV0
+ file "out/nt_R_counts.tsv"  into g_20_outFileTSV_g_24
+ file "out/nt_A_counts.tsv"  into g_20_outFileTSV_g_25
 
 errorStrategy 'retry'
 maxRetries 1
@@ -790,7 +901,10 @@ use strict;
 
 #################### VARIABLES ######################
  my %tf = (
-	"Acounts" => 5
+	"aa_R_counts" => 4,
+	"nt_R_counts" => 5,
+	"aa_A_counts" => 4,
+	"nt_A_counts" => 5
  );
 my $indir=$ENV{'PWD'};
 my $outdir=$ENV{'PWD'}."/out";
@@ -830,8 +944,8 @@ foreach my $type (keys %tf) {
 	
 	open OUT, ">".${out} or die "Could not open ".${out}." file for writting\\n";
 	
-	if ($tf{$type} == 2) {
-	  print OUT "Seq";
+	if ($tf{$type} == 4) {
+	  print OUT "aa\\tpos\\tannot";
 	} else {
 	  print OUT "codon\\taa\\tpos\\tannot";
 	}
@@ -867,19 +981,263 @@ sub replace {
 }
 
 
-process codonPlot {
+process calcFS {
 
-publishDir params.outdir, overwrite: true, mode: 'copy',
-	saveAs: {filename ->
-	if (filename =~ /.*.pdf$/) "codonPlots/$filename"
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*.tsv$/) "SFVals/$filename"}
+input:
+ file nt_A from g_20_outFileTSV_g_25
+ file meta from g_26_txtFile_g_25
+ val wtseq from g_18_barcode_g_25
+
+output:
+ file "*.tsv"  into g_25_outFileTSV0
+ file "*SF_vals.tsv"  into g_25_outFileTSV1
+
+errorStrategy 'retry'
+maxRetries 0
+	
+when:
+(params.run_calcFS && (params.run_calcFS == "yes"))
+
+shell:
+'''
+#!/usr/bin/env perl
+
+use strict;
+use POSIX qw/ceil/;
+
+#################### VARIABLES ######################
+my $indir=$ENV{'PWD'};
+my $outdir=$ENV{'PWD'}."/out";
+ my %Afile = (
+	"codon" => 0,
+	"aa" => 1,
+	"pos" => 2,
+	"annot" => 3
+ ); 
+
+ sub median {( sort { $a <=> $b } @_ )[ ceil( $#_/2 ) ] }
+ my @aalist= qw(A R N D C Q E G H I L K M F P S T W Y V *);
+ my %table = (
+    'TCA' => 'S',    # Serine
+    'TCC' => 'S',    # Serine
+    'TCG' => 'S',    # Serine
+    'TCT' => 'S',    # Serine
+    'TTC' => 'F',    # Phenylalanine
+    'TTT' => 'F',    # Phenylalanine
+    'TTA' => 'L',    # Leucine
+    'TTG' => 'L',    # Leucine
+    'TAC' => 'Y',    # Tyrosine
+    'TAT' => 'Y',    # Tyrosine
+    'TAA' => '*',    # Stop
+    'TAG' => '*',    # Stop
+    'TGC' => 'C',    # Cysteine
+    'TGT' => 'C',    # Cysteine
+    'TGA' => '*',    # Stop
+    'TGG' => 'W',    # Tryptophan
+    'CTA' => 'L',    # Leucine
+    'CTC' => 'L',    # Leucine
+    'CTG' => 'L',    # Leucine
+    'CTT' => 'L',    # Leucine
+    'CCA' => 'P',    # Proline
+    'CCC' => 'P',    # Proline
+    'CCG' => 'P',    # Proline
+    'CCT' => 'P',    # Proline
+    'CAC' => 'H',    # Histidine
+    'CAT' => 'H',    # Histidine
+    'CAA' => 'Q',    # Glutamine
+    'CAG' => 'Q',    # Glutamine
+    'CGA' => 'R',    # Arginine
+    'CGC' => 'R',    # Arginine
+    'CGG' => 'R',    # Arginine
+    'CGT' => 'R',    # Arginine
+    'ATA' => 'I',    # Isoleucine
+    'ATC' => 'I',    # Isoleucine
+    'ATT' => 'I',    # Isoleucine
+    'ATG' => 'M',    # Methionine
+    'ACA' => 'T',    # Threonine
+    'ACC' => 'T',    # Threonine
+    'ACG' => 'T',    # Threonine
+    'ACT' => 'T',    # Threonine
+    'AAC' => 'N',    # Asparagine
+    'AAT' => 'N',    # Asparagine
+    'AAA' => 'K',    # Lysine
+    'AAG' => 'K',    # Lysine
+    'AGC' => 'S',    # Serine
+    'AGT' => 'S',    # Serine
+    'AGA' => 'R',    # Arginine
+    'AGG' => 'R',    # Arginine
+    'GTA' => 'V',    # Valine
+    'GTC' => 'V',    # Valine
+    'GTG' => 'V',    # Valine
+    'GTT' => 'V',    # Valine
+    'GCA' => 'A',    # Alanine
+    'GCC' => 'A',    # Alanine
+    'GCG' => 'A',    # Alanine
+    'GCT' => 'A',    # Alanine
+    'GAC' => 'D',    # Aspartic Acid
+    'GAT' => 'D',    # Aspartic Acid
+    'GAA' => 'E',    # Glutamic Acid
+    'GAG' => 'E',    # Glutamic Acid
+    'GGA' => 'G',    # Glycine
+    'GGC' => 'G',    # Glycine
+    'GGG' => 'G',    # Glycine
+    'GGT' => 'G',    # Glycine
+    );
+################### PARAMETER PARSING ####################
+`mkdir -p $outdir`;
+
+open(IN, "!{nt_A}");
+open(META, "!{meta}");
+my $wtseq= "!{wtseq}";
+my $len=length($wtseq)/3;
+my @comps = [];
+
+# Read A values and annotations for each libray, position and codon.
+# The hash will be Avals{lib}{pos}{codon}
+# While reading, read syn and stop for each lib as well into other hash variables per library
+# Astop and Asyn will be array into hash per position %Asyn{lib}{pos} = \\@AllSyn and same for stop codon
+my %Avals = {};
+my %Avalsaa = {};
+my %Annots = {};
+my %Annotsaa = {};
+my %Astop = {};
+my %Asyn = {};
+my @Aheader = [];
+my $i=0;
+while(my $row=<IN>){
+	my @line = split(/[\\t,\\s]/,$row);
+	my $pos = $line[$Afile{"pos"}];
+	my $aa = $line[$Afile{"aa"}];
+	my $codon = $line[$Afile{"codon"}];
+	my $ann = $line[$Afile{"annot"}];
+	# line = codon,aa,pos,annot,lib{1},lib{2} ... 
+	if ($i==0){
+		@Aheader = @line;
+		for(my $j=4; $j<=$#Aheader; $j++){
+			my $lib = $Aheader[$j];
+			$Avals{$lib}=() if (!exists($Avals{$lib}));
+			$Avalsaa{$lib}=() if (!exists($Avalsaa{$lib}));
+			$Annots{$lib}=() if (!exists($Annots{$lib}));
+			$Annotsaa{$lib}=() if (!exists($Annotsaa{$lib}));
+			$Astop{$lib}=() if (!exists($Astop{$lib}));
+			$Asyn{$lib}=() if (!exists($Asyn{$lib}));
+		}
+	}else{
+		for(my $j=4; $j<=$#Aheader; $j++){
+			my $lib = $Aheader[$j];
+			
+			$Avals{$lib}{$pos}=() if (!exists($Avals{$lib}{$pos}));
+			$Avalsaa{$lib}{$pos}=() if (!exists($Avalsaa{$lib}{$pos}));
+			$Annots{$lib}{$pos}=() if (!exists($Annots{$lib}{$pos}));
+			$Annotsaa{$lib}{$pos}=() if (!exists($Annotsaa{$lib}{$pos}));
+			$Astop{$lib}{$pos}=[] if (!exists($Astop{$lib}{$pos}));
+			$Asyn{$lib}{$pos}=[] if (!exists($Asyn{$lib}{$pos}));
+	
+			$Avals{$lib}{$pos}{$codon} = $line[$j];
+			$Annots{$lib}{$pos}{$codon} = "$codon\\t$aa\\t$pos\\t$ann";
+			my $aa = $table{$codon};
+			if (!exists($Avalsaa{$lib}{$pos}{$aa})){
+			  $Avalsaa{$lib}{$pos}{$aa} = 2**$line[$j];
+			  $ann="wt" if($ann=="syn");
+			  $Annotsaa{$lib}{$pos}{$aa} = "$aa\\t$pos\\t$ann";
+			}else{
+			  $Avalsaa{$lib}{$pos}{$aa} += 2**$line[$j];
+			}
+			if ($ann eq "syn"){
+				push(@{$Asyn{$lib}{$pos}}, $line[$j]);
+				print $lib."\\t".$Annots{$lib}{$pos}{$codon}."\\t".$line[$j]."\\n";
+			}elsif ($ann eq "stop"){
+				push(@{$Astop{$lib}{$pos}}, $line[$j]);
+				print $lib."\\t".$Annots{$lib}{$pos}{$codon}."\\t".$line[$j]."\\n";
+			}
+		}
+	}
+	$i++;
 }
 
+my %Fvals = {};
+my %Fvalsaa = {};
+my %Fwtsyn = {};
+my %Fstop = {};
+my %Svals = {};
+my %Svalsaa = {};
+
+$i=0;
+# Read metadata file
+while(my $meta=<META>){
+        if($i>0){
+        chomp($meta);
+        my @line = split(/[\\t,\\s]/,$meta);
+		my $P1=$line[0];
+		my $P0=$line[1];
+		my $comp=$P1."_".$P0;
+		open(OUTNT, ">".$comp."_NT_SF_vals.tsv");
+		print OUTNT "codon\\taa\\tpos\\tannot\\tFvals\\tSvals\n";
+		open(OUTAA, ">".$comp."_AA_SF_vals.tsv");
+		print OUTAA "aa\\tpos\\tannot\\tFvals\\tSvals\n";
+		
+		$Fvals{$comp}=() if (!exists( $Fvals{$comp}));
+		$Fvalsaa{$comp}=() if (!exists( $Fvals{$comp}));
+		$Fwtsyn{$comp}=() if (!exists( $Fwtsyn{$comp}));
+		$Fstop{$comp}=() if (!exists( $Fstop{$comp}));
+		
+		$Svals{$comp}=()  if (!exists( $Svals{$comp}));
+		$Svalsaa{$comp}=()  if (!exists( $Svals{$comp}));
+		
+		for(my $pos=1; $pos<=$len; $pos++) {
+			# Calc median Fwtsyn and Fstop for each position
+			$Fwtsyn{$comp}{$pos} = median(@{$Asyn{$P1}{$pos}}) - median(@{$Asyn{$P0}{$pos}});
+			$Fstop{$comp}{$pos} = median(@{$Astop{$P1}{$pos}}) - median(@{$Astop{$P0}{$pos}});
+			print "$comp\\tFwtsyn\\t".$comp."\\t".$pos."\\t".$Fwtsyn{$comp}{$pos}."\\t". median(@{$Asyn{$P1}{$pos}})." - ".median(@{$Asyn{$P0}{$pos}})."\\n";
+			print "$comp\\tFstop\\t".$comp."\\t".$pos."\\t".$Fstop{$comp}{$pos}."\\t". median(@{$Astop{$P1}{$pos}})." - ".median(@{$Astop{$P0}{$pos}})."\\n";
+			
+			# Calc F and S for all nts
+			
+			$Fvals{$comp}{$pos}=() if (!exists( $Fvals{$comp}{$pos}));
+			$Svals{$comp}{$pos}=() if (!exists( $Svals{$comp}{$pos}));
+			foreach my $codon (sort keys %table){
+				# F = Ap1 - Ap0
+				$Fvals{$comp}{$pos}{$codon} = $Avals{$P1}{$pos}{$codon} - $Avals{$P0}{$pos}{$codon};
+				print "$comp\\tAvals\\t".$Annots{$P1}{$pos}{$codon}."\\t".$Avals{$P1}{$pos}{$codon}."\\t".$pos."\\t".$Avals{$P0}{$pos}{$codon}."\\n";
+				# S = Fmut - Fwtsyn / Fwtsyn - Fstop
+				$Svals{$comp}{$pos}{$codon} = ($Fvals{$comp}{$pos}{$codon} - $Fwtsyn{$comp}{$pos}) / ($Fwtsyn{$comp}{$pos} - $Fstop{$comp}{$pos});
+			    print "$comp\\tFvals\\t".$Annots{$P1}{$pos}{$codon}."\\t(".$Fvals{$comp}{$pos}{$codon}." - ".$Fwtsyn{$comp}{$pos}.") / (".$Fwtsyn{$comp}{$pos}." - ".$Fstop{$comp}{$pos}.")\\n";
+			    print "$comp\\tFvals\\t".$Annots{$P1}{$pos}{$codon}."\\t".$Fvals{$comp}{$pos}{$codon}."\\t".$pos."\\t".$Svals{$comp}{$pos}{$codon}."\\n";
+			    print OUTNT $Annots{$P1}{$pos}{$codon}."\\t".$Fvals{$comp}{$pos}{$codon}."\\t".$Svals{$comp}{$pos}{$codon}."\\n";
+			}
+			
+			# Calc F and S for all aa
+			$Fvalsaa{$comp}{$pos}=() if (!exists( $Fvalsaa{$comp}{$pos}));
+			$Svalsaa{$comp}{$pos}=() if (!exists( $Svalsaa{$comp}{$pos}));
+			foreach my $aa (@aalist){
+			    $Fvalsaa{$comp}{$pos}{$aa} = log($Avalsaa{$P1}{$pos}{$aa})/log(2) - log($Avalsaa{$P0}{$pos}{$aa})/log(2);
+			    $Svalsaa{$comp}{$pos}{$aa} = ($Fvalsaa{$comp}{$pos}{$aa} - $Fwtsyn{$comp}{$pos}) / ($Fwtsyn{$comp}{$pos} - $Fstop{$comp}{$pos});
+			    print OUTAA $Annotsaa{$P1}{$pos}{$aa}."\\t".$Fvalsaa{$comp}{$pos}{$aa}."\\t".$Svalsaa{$comp}{$pos}{$aa}."\\n";
+			}
+	    }
+	close(OUTNT);
+    close(OUTAA);
+
+    }
+    $i++;
+}
+'''
+
+
+}
+
+
+process codonPlot {
+
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*.pdf$/) "codonPlots/$filename"}
 input:
  file tsvfile from g_20_outFileTSV_g_24
  val wtseq from g_18_barcode_g_24
+ val startpos from g_27_value_tuple_g_24
 
 output:
- file "*.pdf"  into g_24_outputFilePdf
+ file "*.pdf"  into g_24_outputFilePdf0
 
 errorStrategy 'retry'
 maxRetries 1
@@ -893,26 +1251,28 @@ library(data.table)
 library(reshape)
 library(ggplot2)
 
-Acounts <- read.delim("!{tsvfile}")
+Rcounts <- read.delim("!{tsvfile}")
+startpos <- !{startpos}
 wtseq <- "!{wtseq}"
-Ac_sorted <- Acounts[with(Acounts, order(pos, codon)),]
+Rc_sorted <- Rcounts[with(Rcounts, order(pos, codon)),]
 
-libs <- colnames(Acounts)[5:ncol(Acounts)]
+libs <- colnames(Rcounts)[5:ncol(Rcounts)]
 
 for (lib in libs) {
 
 	p  <- list()
+	pdf(paste0("barfreq",lib,".pdf"), height=20, width=20,  paper = "a4r", compress=TRUE)
 	for (pos in seq(1:(nchar(wtseq)/3))) {
 	
-		Ac_sorted_pos <- Ac_sorted[Ac_sorted$pos==pos,c("pos", "aa", "codon", "annot", lib)]
-		names(Ac_sorted_pos) <-  c("pos", "aa", "codon", "annot", "count")
-		freq.by_aa <- data.table(ddply(Ac_sorted_pos, c("pos","aa"), summarize, Freq = sum(count)))
+		Rc_sorted_pos <- Rc_sorted[Rc_sorted$pos==pos,c("pos", "aa", "codon", "annot", lib)]
+		names(Rc_sorted_pos) <-  c("pos", "aa", "codon", "annot", "count")
+		freq.by_aa <- data.table(ddply(Rc_sorted_pos, c("pos","aa"), summarize, Freq = sum(count)))
 		
 		freq.aa_table <- dcast(freq.by_aa , aa ~ pos, value.var="Freq")
 		
 		aa.totals <- freq.by_aa
 		names(aa.totals) <- c("pos", "AA", "Freq.AA")
-		codon.totals <- Ac_sorted_pos[, c("codon", "aa", "pos", "annot", "count")]
+		codon.totals <- Rc_sorted_pos[, c("codon", "aa", "pos", "annot", "count")]
 		names(codon.totals) <- c("Codon", "AA", "pos", "annot", "Freq")
 		codon.totals$Codon <- paste0(codon.totals$Codon, "\\n(",codon.totals$annot,")")
 		aa.codon.totals <- codon.totals %>% right_join(aa.totals, by=c("AA", "pos"))
@@ -928,15 +1288,24 @@ for (lib in libs) {
 		  ylim(0, 1.2) +
 		  facet_wrap(~AA.Display, scale = "free_x") + 
 		  geom_text(colour = "black", vjust = -0.5) + theme_bw() +
-		  ggtitle(paste0(lib," pos:", pos, " codon frequency plot")) +
+		  ggtitle(paste0(lib," pos:", pos + startpos - 1, " codon frequency plot")) +
 		  theme(plot.title = element_text(hjust = 0.5)) +
 		  xlab("Codon") + ylab("Codon % Freq.")
+		
+		Rc_p<- Rc_sorted[Rc_sorted$pos==pos & Rc_sorted$annot!="wt" ,]
+		Rc_p_freq <- Rc_p
+		Rc_p_freq[,lib] <- Rc_p[,lib]/sum( Rc_p[,lib])
+        barplot(Rc_p_freq[,lib], names.arg = Rc_p_freq[,"codon"], 
+		    main=paste0(lib," pos:", pos, " codon frequency plot"))
+
 	}
+	graphics.off()
 	pdf(paste0("bar",lib,".pdf"), height=20, width=20,  paper = "a4r", compress=TRUE)
 	for (pos in seq(1:(nchar(wtseq)/3))) {
 	  print(p[[pos]])
 	}
 	graphics.off()
+	
 }
 
 '''
@@ -1050,7 +1419,7 @@ input:
 
 output:
  file "adapter_removal_summary.tsv"  into g15_11_outputFileTSV_g_16
- file "adapter_removal_detailed_summary.tsv" optional true  into g15_11_outputFile
+ file "adapter_removal_detailed_summary.tsv" optional true  into g15_11_outputFile1
 
 shell:
 '''
@@ -1183,18 +1552,14 @@ if ($HOSTNAME == "ghpcc06.umassrc.org"){
 
 process Overall_Summary {
 
-publishDir params.outdir, overwrite: true, mode: 'copy',
-	saveAs: {filename ->
-	if (filename =~ /overall_summary.tsv$/) "summary/$filename"
-}
-
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /overall_summary.tsv$/) "summary/$filename"}
 input:
  file adapterSum from g15_11_outputFileTSV_g_16
  file trimmerSum from g15_21_outputFileTSV_g_16
  file qualitySum from g15_16_outputFileTSV_g_16
 
 output:
- file "overall_summary.tsv"  into g_16_outputFileTSV
+ file "overall_summary.tsv"  into g_16_outputFileTSV0
 
 shell:
 '''
@@ -1217,7 +1582,7 @@ my @files = ();
 # order must be in this order for chipseq pipeline: bowtie->dedup
 # rsem bam pipeline: dedup->rsem, star->dedup
 # riboseq ncRNA_removal->star
-my @order = ("adapter_removal","trimmer","quality","extractUMI","extractValid","sequential_mapping","ncRNA_removal","bowtie","star","hisat2","tophat2", "dedup","rsem","kallisto","esat","count");
+my @order = ("adapter_removal","trimmer","quality","extractUMI","extractValid","tRAX","sequential_mapping","ncRNA_removal","bowtie","star","hisat2","tophat2", "dedup","rsem","kallisto","esat","count");
 for ( my $k = 0 ; $k <= $#order ; $k++ ) {
     for ( my $i = 0 ; $i <= $#rawFiles ; $i++ ) {
         if ( $rawFiles[$i] =~ /$order[$k]/ ) {
@@ -1290,17 +1655,13 @@ sub uniq {
 
 process Adapter_Trimmer_Quality_Module_FastQC {
 
-publishDir params.outdir, overwrite: true, mode: 'copy',
-	saveAs: {filename ->
-	if (filename =~ /.*.(html|zip)$/) "fastQC/$filename"
-}
-
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*.(html|zip)$/) "fastQC/$filename"}
 input:
  val mate from g_3_mate_g15_3
  set val(name), file(reads) from g_2_reads_g15_3
 
 output:
- file '*.{html,zip}'  into g15_3_FastQCout
+ file '*.{html,zip}'  into g15_3_FastQCout0
 
 errorStrategy 'retry'
 maxRetries 3
